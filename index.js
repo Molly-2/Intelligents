@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const axios = require('axios'); // Import Axios for making API requests
+
 const app = express();
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -59,7 +60,9 @@ app.get('/ai', async (req, res) => {
         } else {
             try {
                 // Fallback to external API, appending Hassan's name to the response
-                const apiResponse = await axios.get(`https://hassan-llama3-aipk.onrender.com/llama3?prompt=${encodeURIComponent(userPrompt)}`);
+                const apiResponse = await axios.get(`https://hassan-llama3-aipk.onrender.com/llama3?prompt=${encodeURIComponent(userPrompt)}`, {
+                    timeout: 5000 // timeout after 5 seconds
+                });
                 let response = apiResponse.data.response;
 
                 // Ensure the external API response mentions "Hassan"
@@ -73,7 +76,7 @@ app.get('/ai', async (req, res) => {
                 chatHistory.push({ response });
                 res.send(response);
             } catch (error) {
-                console.error('Error fetching response from external API:', error);
+                console.error('Error fetching response from external API:', error.message || error);
                 res.send("404 Error ❗");
             }
         }
