@@ -4,13 +4,16 @@ const fs = require('fs');
 const axios = require('axios'); // Import Axios for making API requests
 
 const app = express();
+const port = 3000; // Port for the server
 
+// Middleware to parse JSON and URL-encoded data
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// Object to store AI memory (learned prompts)
 let aiMemory = {};
 
-// Load learned prompts from file on startup
+// Load learned prompts from a file on server startup
 function loadMemory() {
     try {
         if (fs.existsSync('teach.txt')) {
@@ -24,7 +27,7 @@ function loadMemory() {
     }
 }
 
-// Save learned prompts to file
+// Save learned prompts to a file
 function saveMemory() {
     try {
         fs.writeFileSync('teach.txt', JSON.stringify(aiMemory, null, 2));
@@ -37,32 +40,37 @@ function saveMemory() {
 // Initial load of AI memory
 loadMemory();
 
+// Array to store chat history
 let chatHistory = [];
 
-// Serve the HTML file
+// Serve static HTML files
 app.use(express.static('public'));
 
-// Helper function to get a random response
+// Helper function to get a random response from an array of responses
 function getRandomResponse(responses) {
     return responses[Math.floor(Math.random() * responses.length)];
 }
 
+// AI response endpoint
 app.get('/ai', async (req, res) => {
     const userPrompt = req.query.prompt?.toLowerCase();
+
     if (userPrompt) {
         chatHistory.push({ prompt: userPrompt });
 
         if (aiMemory[userPrompt]) {
+            // If the prompt is recognized, respond with a stored response
             const responses = aiMemory[userPrompt];
             const response = getRandomResponse(responses);
             chatHistory.push({ response });
             res.send(response);
         } else {
             try {
-                // Fallback to external API, appending Hassan's name to the response
+                // Fallback to external API, appending "Regards, Hassan" to the response
                 const apiResponse = await axios.get(`https://hassan-llama3-aipk.onrender.com/llama3?prompt=${encodeURIComponent(userPrompt)}`, {
                     timeout: 5000 // timeout after 5 seconds
                 });
+
                 let response = apiResponse.data.response;
 
                 // Ensure the external API response mentions "Hassan"
@@ -85,29 +93,35 @@ app.get('/ai', async (req, res) => {
     }
 });
 
+// Teach the AI new prompts and responses
 app.post('/teach', (req, res) => {
     const { prompt, response } = req.body;
+
     if (prompt && response) {
         const lowerCasePrompt = prompt.toLowerCase();
         aiMemory[lowerCasePrompt] = aiMemory[lowerCasePrompt] || [];
         aiMemory[lowerCasePrompt].push(response);
-        console.log('Learned:', lowerCasePrompt, '->', response); // Debug line
+
+        console.log('Learned:', lowerCasePrompt, '->', response); // Debugging log
         saveMemory(); // Save the updated AI memory to file
+
         res.send(`Learned: "${prompt}" -> "${response}"`);
     } else {
         res.status(400).send("Invalid data format. Provide both 'prompt' and 'response'.");
     }
 });
 
+// Endpoint to return chat history
 app.get('/history', (req, res) => {
     res.json(chatHistory);
 });
 
-// Inspect the current AI memory
+// Endpoint to inspect the current AI memory
 app.get('/inspectMemory', (req, res) => {
     res.json(aiMemory);
 });
 
-app.listen(3000, () => {
-    console.log('AI server is running on port 3000');
+// Start the server
+app.listen(port, () => {
+    console.log(`AI server is running on port ${port}`);
 });
