@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const fs = require('fs');
+const axios = require('axios'); // Import Axios for making API requests
 const app = express();
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -40,28 +41,54 @@ let chatHistory = [];
 // Serve the HTML file
 app.use(express.static('public'));
 
-app.get('/ai', (req, res) => {
+// Helper function to get a random response
+function getRandomResponse(responses) {
+    return responses[Math.floor(Math.random() * responses.length)];
+}
+
+app.get('/ai', async (req, res) => {
     const userPrompt = req.query.prompt?.toLowerCase();
     if (userPrompt) {
         chatHistory.push({ prompt: userPrompt });
 
         if (aiMemory[userPrompt]) {
-            const response = aiMemory[userPrompt];
+            const responses = aiMemory[userPrompt];
+            const response = getRandomResponse(responses);
             chatHistory.push({ response });
-            res.json({ response });
+            res.send(response);
         } else {
-            res.status(404).json({ response: "I'm sorry, I don't know how to respond to that." });
+            try {
+                // Fallback to external API, appending Hassan's name to the response
+                const apiResponse = await axios.get(`https://hassan-llama3-aipk.onrender.com/llama3?prompt=${encodeURIComponent(userPrompt)}`);
+                let response = apiResponse.data.response;
+
+                // Ensure the external API response mentions "Hassan"
+                response = `${response} - Regards, Hassan`;
+
+                // Save the response to AI memory
+                aiMemory[userPrompt] = aiMemory[userPrompt] || [];
+                aiMemory[userPrompt].push(response);
+                saveMemory(); // Save the updated AI memory to file
+
+                chatHistory.push({ response });
+                res.send(response);
+            } catch (error) {
+                console.error('Error fetching response from external API:', error);
+                res.send("404 Error ❗");
+            }
         }
     } else {
-        res.status(400).json({ response: "Please provide a prompt." });
+        res.send("Please provide a prompt.");
     }
 });
 
 app.post('/teach', (req, res) => {
     const { prompt, response } = req.body;
     if (prompt && response) {
-        aiMemory[prompt.toLowerCase()] = response;
-        console.log('Learned:', prompt.toLowerCase(), '->', response); // Debug line
+        const lowerCasePrompt = prompt.toLowerCase();
+        aiMemory[lowerCasePrompt] = aiMemory[lowerCasePrompt] || [];
+        aiMemory[lowerCasePrompt].push(response);
+        console.log('Learned:', lowerCasePrompt, '->', response); // Debug line
         saveMemory(); // Save the updated AI memory to file
         res.send(`Learned: "${prompt}" -> "${response}"`);
     } else {
