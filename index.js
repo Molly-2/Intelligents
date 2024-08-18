@@ -48,13 +48,12 @@ app.get('/ai', (req, res) => {
         if (aiMemory[userPrompt]) {
             const response = aiMemory[userPrompt];
             chatHistory.push({ response });
-            res.send(response);
+            res.json({ response });
         } else {
-            chatHistory.push({ response: "404 Error ❗" });
-            res.send("404 Error ❗");
+            res.status(404).json({ response: "I'm sorry, I don't know how to respond to that." });
         }
     } else {
-        res.send("Please provide a prompt.");
+        res.status(400).json({ response: "Please provide a prompt." });
     }
 });
 
